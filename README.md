@@ -8,8 +8,8 @@ extend plugin: jquery.min.js, jquery.placeholder.min.js
 
 ```
 .form_check_invalid_msg {
-	/* 錯誤的樣式 */
-	border: 1px red solid;
+	/* 錯誤的樣式for ERR_DISPLAY: append */
+	color: red;
 }
 ```
 

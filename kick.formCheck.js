@@ -198,7 +198,7 @@ var KICK = KICK || {};
 					
 					case 'append':
 						for (var k in _this.ERRS) {
-							_this.DATA[k]['object'].parent().append('<span class="' + _this.ERR_DISPLAY_APPEND_CLASS + '">' + _this.ERRS[k] + '</span>');
+							_this.DATA[k]['object'].after('<span class="' + _this.ERR_DISPLAY_APPEND_CLASS + '">' + _this.ERRS[k] + '</span>');
 						}
 						break;
 				}
