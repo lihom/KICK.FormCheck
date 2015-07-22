@@ -26,12 +26,32 @@ var KICK = KICK || {};
 		this.ERR_DISPLAY_APPEND_CLASS = 'form_check_invalid_msg';
 		this.DATA = [];
 		this.DISABLE_NAME = 'invalid';
+		this.LANG = 'en';
 		this.$form = {};
 		this.form_event = 'submit';
 		this.$form_event_ta = {};
+		this.form_event_ta = null;
+		this.submit_hook = null;
+		this.valid_err_hook = null;
 		
 		// Private value
 		var _debug = false;
+		var form_err_lang = {
+			'tw': {
+				'empty': '欄位必填',
+				'format': '格式錯誤',
+				'choose': '選項必選',
+				'length': '字元長度錯誤',
+				'confirm_pw': '確認密碼與密碼不符'
+			},
+			'en': {
+				'empty': 'field is required',
+				'format': 'format error',
+				'choose': 'options required',
+				'length': 'word length error',
+				'confirm_pw': 'confirm password and password do not match'
+			}
+		};
 		
 		// Hook function
 		this.submit_hook = {};
@@ -43,6 +63,7 @@ var KICK = KICK || {};
 			_this.$form_event_ta = (!_this.form_event_ta) ? _this.$form : $(_this.form_event_ta);
 			
 			_this.create_data();
+			_this.bind_self();
 
 			_this.$form_event_ta.bind(_this.form_event, function(e) {
 				e.preventDefault();
@@ -107,6 +128,7 @@ var KICK = KICK || {};
 					arr = [];
 				
 				arr['reg'] = $this.attr('reg') ? $this.attr('reg') : '';
+				arr['bind'] = $this.attr('bind') ? $this.attr('bind') : '';
 				arr['label'] = $this.attr('label') ? $this.attr('label') : '';
 				arr['name'] = $this.attr('name');
 				arr['value'] = $this.val();
@@ -116,6 +138,28 @@ var KICK = KICK || {};
 				
 				_this.DATA.push(arr);
 			});
+		};
+
+
+		/*
+		 * create_data
+		 * @note	
+		 * 
+		 */
+		 
+		this.bind_self = function() {
+			for (var k in _this.DATA) {
+				if (_this.DATA[k]['bind'] != '') {
+					var obj = _this.DATA[k]['object'],
+						evt = _this.DATA[k]['bind'];
+
+					obj.data('index', k);
+
+					obj.bind(evt, function() {
+						_this.reg_valid($(this).data('index'));
+					});
+				}
+			}
 		};
 		
 		
@@ -127,6 +171,7 @@ var KICK = KICK || {};
 		 
 		this.valid = function() {
 			if (typeof _this.invalid_hook == 'function') _this.invalid_hook();
+
 			_this.ERR = 0;
 			_this.ERRS = [];
 			_this.create_data();
@@ -137,11 +182,10 @@ var KICK = KICK || {};
 				if (_debug) console.log('name: '+_this.DATA[k]['name']+', value: '+_this.DATA[k]['value']);
 				switch (_this.DATA[k]['tag']) {
 					case 'input':
-						
 						switch (_this.DATA[k]['type']) {
 							case 'text':
 							case 'password':
-								if (_this.DATA[k]['value'] == '' || _this.DATA[k]['value'] == _this.DATA[k]['object'].attr('placeholder')) {
+								if (_this.DATA[k]['value'] == '') {
 									_this.empty_err(k);
 								} else {
 									_this.reg_valid(k);
@@ -198,12 +242,30 @@ var KICK = KICK || {};
 					
 					case 'append':
 						for (var k in _this.ERRS) {
-							_this.DATA[k]['object'].after('<span class="' + _this.ERR_DISPLAY_APPEND_CLASS + '">' + _this.ERRS[k] + '</span>');
+							_this.DATA[k]['object'].parent().append('<span class="' + _this.ERR_DISPLAY_APPEND_CLASS + '">' + _this.ERRS[k] + '</span>');
+						}
+						break;
+
+					case 'dialog':
+						var err_alert_str = '';
+						for (var k in _this.ERRS) {
+							if (err_alert_str.lastIndexOf(_this.ERRS[k]) <= -1) {
+								err_alert_str += '* '+_this.ERRS[k]+'</br>';
+							}
+						}
+						try {
+							_msg.alert(err_alert_str);
+						} catch (err) {
+							alert(err_alert_str);
 						}
 						break;
 				}
+
+				if (_this.valid_err_hook) {
+					_this.valid_err_hook();
+				}
 			} else {
-				if (typeof _this.submit_hook == 'function') {
+				if (_this.submit_hook) {
 					_this.submit_hook();
 				} else {
 					if (_debug) {
@@ -225,7 +287,7 @@ var KICK = KICK || {};
 		this.empty_err = function(k) {
 			_this.ERR++;
 			_this.ERRS[k] = [];
-			_this.ERRS[k] = _this.DATA[k]['label'] + '欄位必填';
+			_this.ERRS[k] = _this.DATA[k]['label'] + ' ' + form_err_lang[_this.LANG]['empty'];
 		};
 		
 		
@@ -238,7 +300,7 @@ var KICK = KICK || {};
 		this.format_err = function(k) {
 			_this.ERR++;
 			_this.ERRS[k] = [];
-			_this.ERRS[k] = _this.DATA[k]['label'] + '格式錯誤';
+			_this.ERRS[k] = _this.DATA[k]['label'] + ' ' + form_err_lang[_this.LANG]['format'];
 		};
 		
 		
@@ -251,7 +313,7 @@ var KICK = KICK || {};
 		this.choose_err = function(k) {
 			_this.ERR++;
 			_this.ERRS[k] = [];
-			_this.ERRS[k] = _this.DATA[k]['label'] + '選項必選';
+			_this.ERRS[k] = _this.DATA[k]['label'] + ' ' + form_err_lang[_this.LANG]['choose'];
 		};
 		
 		
@@ -264,7 +326,7 @@ var KICK = KICK || {};
 		this.length_err = function(k) {
 			_this.ERR++;
 			_this.ERRS[k] = [];
-			_this.ERRS[k] = _this.DATA[k]['label'] + '字元長度錯誤';
+			_this.ERRS[k] = _this.DATA[k]['label'] + ' ' + form_err_lang[_this.LANG]['length'];
 		};
 		
 		
@@ -277,7 +339,7 @@ var KICK = KICK || {};
 		this.confirm_pw_err = function(k) {
 			_this.ERR++;
 			_this.ERRS[k] = [];
-			_this.ERRS[k] = _this.DATA[k]['label'] + '確認密碼與密碼不符';
+			_this.ERRS[k] = _this.DATA[k]['label'] + ' ' + form_err_lang[_this.LANG]['confirm_pw'];
 		};
 		
 		
@@ -288,17 +350,21 @@ var KICK = KICK || {};
 		 */
 		 
 		this.reg_valid = function(k) {
+			var obj = _this.DATA[k]['object'],
+				reg = _this.DATA[k]['reg'],
+				val = obj.val();
+			
 			var result = new Boolean(),
 				patt = new RegExp();
 				
-			switch (_this.DATA[k]['reg']) {
+			switch (reg) {
 				case 'invoice':
 					patt = new RegExp("^[a-zA-Z]{2}[0-9]{8}$");
 					break;
 					
 				case 'phone':
 					// length error
-					if (_this.DATA[k]['value'].length < 1 || _this.DATA[k]['value'].length > 99) {
+					if (val.length < 1 || val.length > 99) {
 						_this.length_err(k);
 						return;
 					}
@@ -315,7 +381,7 @@ var KICK = KICK || {};
 					
 				case 'zip_code':
 					// length error
-					if (_this.DATA[k]['value'].length < 0 || _this.DATA[k]['value'].length > 99) {
+					if (val.length < 0 || val.length > 99) {
 						_this.length_err(k);
 						return;
 					}
@@ -334,7 +400,7 @@ var KICK = KICK || {};
 				case 'pw':
 				case 'old_pw':
 					// length error
-					if (_this.DATA[k]['value'].length < 6 || _this.DATA[k]['value'].length > 20) {
+					if (val.length < 6 || val.length > 20) {
 						_this.length_err(k);
 						return;
 					}
@@ -345,7 +411,7 @@ var KICK = KICK || {};
 					
 				case 'confirm_pw':
 					// length error
-					if (_this.DATA[k]['value'].length < 6 || _this.DATA[k]['value'].length > 20) {
+					if (val.length < 6 || val.length > 20) {
 						_this.length_err(k);
 						return;
 					}
@@ -355,22 +421,31 @@ var KICK = KICK || {};
 					break;
 					
 				case 'custom':
-					patt = new RegExp(_this.DATA[k]['object'].attr('regSyntax'));
+					patt = new RegExp(obj.attr('regSyntax'));
 					break;
 			}
 			
-			result = patt.test(_this.DATA[k]['value']);
+			result = patt.test(val);
 			if (result) {
-				if (_this.DATA[k]['reg'] == 'social_code') {
+				if (reg == 'social_code') {
 					patt = new RegExp("^[a-zA-Z]{1}[0-9]{9}$");
-					if (patt.test(_this.DATA[k]['value'])) {
-						if (!_this.reg_social_code(_this.DATA[k]['value'], '身分證')) _this.format_err(k);
+					if (patt.test(val)) {
+						if (!_this.reg_social_code(val, '身分證')) _this.format_err(k);
 					}
 				}
-				if (_this.DATA[k]['reg'] == 'confirm_pw') {
+				if (reg == 'confirm_pw') {
 					if ($('input[reg="pw"]', _this.$form).val() != $('input[reg="confirm_pw"]', _this.$form).val()) {
 						_this.confirm_pw_err(k);
 					}
+				}
+				if (reg == 'credit_card') {
+					if (!_this.reg_credit_card(val, obj)) _this.format_err(k);
+				}
+				if (reg == 'credit_card_expire') {
+					if (!_this.reg_credit_card_expire(val)) _this.format_err(k);
+				}
+				if (reg == 'credit_card_cvc') {
+					if (!_this.reg_credit_card_cvc(val)) _this.format_err(k);
 				}
 			} else {
 				_this.format_err(k);
@@ -452,6 +527,141 @@ var KICK = KICK || {};
 					break;
 			}
 			
+			return false;
+		};
+
+
+		/*
+		 * reg_credit_card
+		 * @note	valid form field
+		 * 
+		 */
+		
+		this.reg_credit_card = function(val, obj) {
+			val = val.replace(/\D+/g, '');
+
+			var card_class = 'icon_cards';
+			var card_types = [
+				{
+					name: 'amex',
+					pattern: /^3[47]/,
+					valid_length: [15]
+				}, {
+					name: 'diners_club_carte_blanche',
+					pattern: /^30[0-5]/,
+					valid_length: [14]
+				}, {
+					name: 'diners_club_international',
+					pattern: /^36/,
+					valid_length: [14]
+				}, {
+					name: 'jcb',
+					pattern: /^35(2[89]|[3-8][0-9])/,
+					valid_length: [16]
+				}, {
+					name: 'laser',
+					pattern: /^(6304|670[69]|6771)/,
+					valid_length: [16, 17, 18, 19]
+				}, {
+					name: 'visa_electron',
+					pattern: /^(4026|417500|4508|4844|491(3|7))/,
+					valid_length: [16]
+				}, {
+					name: 'visa',
+					pattern: /^4/,
+					valid_length: [16]
+				}, {
+					name: 'mastercard',
+					pattern: /^5[1-5]/,
+					valid_length: [16]
+				}, {
+					name: 'maestro',
+					pattern: /^(5018|5020|5038|6304|6759|676[1-3])/,
+					valid_length: [12, 13, 14, 15, 16, 17, 18, 19]
+				}, {
+					name: 'discover',
+					pattern: /^(6011|622(12[6-9]|1[3-9][0-9]|[2-8][0-9]{2}|9[0-1][0-9]|92[0-5]|64[4-9])|65)/,
+					valid_length: [16]
+				}
+			];
+
+			for (var k in card_types) {
+				var patt = new RegExp(card_types[k].pattern),
+					result = patt.test(val);
+
+				if (result) {
+					for (var _k in card_types[k].valid_length) {
+						if (val.length == card_types[k].valid_length[_k]) {
+							var card_type = '';
+							switch (card_types[k].name) {
+								case 'diners_club_carte_blanche':
+								case 'diners_club_international':
+								case 'jcb':
+								case 'laser':
+								case 'visa_electron':
+								case 'maestro':
+									card_type = 'other';
+									break;
+
+								default:
+									card_type = card_types[k].name;
+									break;
+							}
+
+							obj.parent().append('<span class="' + card_class + ' ' + card_type + '"></span>');
+							
+							return true;
+						}
+					}
+				}
+			}
+
+			obj.parent().find('.' + card_class).remove();
+
+			return false;
+		};
+
+
+		/*
+		 * reg_credit_card_expire
+		 * @note	valid form field
+		 * 
+		 */
+		
+		this.reg_credit_card_expire = function(val) {
+			val = val.replace(/\D+/g, '');
+
+			var patt = new RegExp(/\d/g),
+				result = patt.test(val);
+
+			if (result && val.length == 4) {
+				var val_1 = val.slice(0, 2),
+					val_2 = val.slice(2, 4),
+					year = String(new Date().getFullYear()).slice(2, 4);
+
+				if (val_1 <= 12 && val_1 >= 1 && val_2 >= year) return true;
+			}
+
+			return false;
+		};
+
+
+		/*
+		 * reg_credit_card_cvc
+		 * @note	valid form field
+		 * 
+		 */
+		
+		this.reg_credit_card_cvc = function(val) {
+			val = val.replace(/\D+/g, '');
+
+			var patt = new RegExp(/\d/g),
+				result = patt.test(val);
+
+			if (result && val.length == 3) {
+				return true;
+			}
+
 			return false;
 		};
 		
